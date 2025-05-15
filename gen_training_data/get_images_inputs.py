@@ -9,10 +9,10 @@ from habitat.sims import make_sim
 
 # 配置文件和路径设置
 config_path = './gen_training_data/config.yaml'  # Habitat配置文件路径
-scene_path = '/home/vlnce/vln-ce/data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
+scene_path = '../data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
 image_path = './training_data/rgbd_fov90/'  # 保存RGB-D图像的基础路径
 save_path = os.path.join(image_path,'{split}/{scan}/{scan}_{node}_mp3d_imgs.pkl')  # 保存图像的具体路径模板
-RAW_GRAPH_PATH= '/home/vlnce/habitat_connectivity_graph/%s.json'  # 连接图数据路径模板
+RAW_GRAPH_PATH= '../data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
 NUMBER = 12  # 每个节点采集的图像数量（对应不同视角）
 
 SPLIT = 'train'  # 数据集划分（训练集）

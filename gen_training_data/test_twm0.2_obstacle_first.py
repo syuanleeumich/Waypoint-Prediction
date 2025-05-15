@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter
 # 全局参数设置
 ANGLES = 120  # 角度划分数量，将360度划分为120个角度
 DISTANCES = 12  # 距离划分数量，将距离空间划分为12个区间
-RAW_GRAPH_PATH = '/home/vlnce/habitat_connectivity_graph/%s.json'  # 连接图数据路径模板
+RAW_GRAPH_PATH = '../data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
 
 RADIUS = 3.25  # 最大前进距离为2米对应的半径值
 

@@ -7,8 +7,8 @@ from utils import Simulator
 
 # 配置文件和路径设置
 config_path = 'gen_training_data/config.yaml'  # Habitat配置文件路径
-scene_path = '/home/vlnce/vln-ce/data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
-RAW_GRAPH_PATH= '/home/vlnce/habitat_connectivity_graph/%s.json'  # 连接图数据路径模板
+scene_path = '../data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
+RAW_GRAPH_PATH= '../data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
 NUMBER = 120  # 角度划分数量，将360度划分为120个角度
 
 SPLIT = 'val_unseen'  # 数据集划分（未见验证集）
