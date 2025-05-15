@@ -6,38 +6,38 @@ import json
 
 def neighborhoods(mu, x_range, y_range, sigma, circular_x=True, gaussian=False):
     """ 
-    生成以mu为中心的掩码，给定x和y范围，原点在输出的中心
-    参数:
-        mu: 张量 (N, 2)，中心点坐标
-        x_range: x轴范围
-        y_range: y轴范围
-        sigma: 掩码的大小或高斯分布的标准差
-        circular_x: 是否在x方向上循环连接（如全景图像）
-        gaussian: 是否使用高斯分布而不是二值掩码
-    返回:
-        张量 (N, y_range, x_range)，生成的掩码
+    Generate a mask centered at mu, given x and y ranges, with origin at the center of the output
+    Args:
+        mu: Tensor (N, 2), center point coordinates
+        x_range: x-axis range
+        y_range: y-axis range
+        sigma: size of the mask or standard deviation of Gaussian distribution
+        circular_x: whether to connect circularly in x direction (like panoramic images)
+        gaussian: whether to use Gaussian distribution instead of binary mask
+    Returns:
+        Tensor (N, y_range, x_range), generated mask
     """
-    # 提取中心点的x和y坐标，并扩展维度以便后续广播
+    # Extract x and y coordinates of center points and expand dimensions for broadcasting
     x_mu = mu[:,0].unsqueeze(1).unsqueeze(1)
     y_mu = mu[:,1].unsqueeze(1).unsqueeze(1)
 
-    # 生成以mu为中心的坐标网格
+    # Generate coordinate grid centered at mu
     x = torch.arange(start=0,end=x_range, device=mu.device, dtype=mu.dtype).unsqueeze(0).unsqueeze(0)
     y = torch.arange(start=0,end=y_range, device=mu.device, dtype=mu.dtype).unsqueeze(1).unsqueeze(0)
 
-    # 计算每个点到中心的距离
+    # Calculate distance from each point to center
     y_diff = y - y_mu
     x_diff = x - x_mu
     if circular_x:
-        # 如果x轴是循环的（如全景图），取两侧距离的最小值
+        # If x-axis is circular (like panoramic), take minimum distance from both sides
         x_diff = torch.min(torch.abs(x_diff), torch.abs(x_diff + x_range))
     
-    # 越靠近中心越接近1
+    # Closer to center means closer to 1
     if gaussian:
-        # 生成高斯分布掩码
+        # Generate Gaussian distribution mask
         output = torch.exp(-0.5 * ((x_diff/sigma[0])**2 + (y_diff/sigma[1])**2 ))
     else:
-        # 生成二值掩码（矩形区域）
+        # Generate binary mask (rectangular region)
         output = torch.logical_and(
             torch.abs(x_diff) <= sigma[0], torch.abs(y_diff) <= sigma[1]
         ).type(mu.dtype)
@@ -47,74 +47,74 @@ def neighborhoods(mu, x_range, y_range, sigma, circular_x=True, gaussian=False):
 
 def nms(pred, max_predictions=10, sigma=(1.0,1.0), gaussian=False):
     ''' 
-    非极大值抑制函数，用于查找预测图中的局部最大值
-    参数:
-        pred: 输入预测图，形状为 (batch_size, 1, height, width)
-        max_predictions: 每个样本要保留的最大预测点数
-        sigma: 抑制区域的大小
-        gaussian: 是否使用高斯抑制而不是矩形抑制
-    返回:
-        经过非极大值抑制的预测图
+    Non-maximum suppression function to find local maxima in prediction maps
+    Args:
+        pred: Input prediction map, shape (batch_size, 1, height, width)
+        max_predictions: Maximum number of predictions to keep per sample
+        sigma: Size of suppression region
+        gaussian: Whether to use Gaussian suppression instead of rectangular suppression
+    Returns:
+        Prediction map after non-maximum suppression
     '''
 
     shape = pred.shape
 
-    # 初始化输出和抑制用的预测图副本
+    # Initialize output and prediction copy for suppression
     output = torch.zeros_like(pred)
     flat_pred = pred.reshape((shape[0],-1))  # (BATCH_SIZE, height*width)
     supp_pred = pred.clone()
     flat_output = output.reshape((shape[0],-1))  # (BATCH_SIZE, height*width)
 
-    # 迭代寻找最大预测点
+    # Iteratively find maximum prediction points
     for i in range(max_predictions):
-        # 找到当前预测图中的全局最大值
+        # Find global maximum in current prediction map
         flat_supp_pred = supp_pred.reshape((shape[0],-1))
         val, ix = torch.max(flat_supp_pred, dim=1)
         indices = torch.arange(0,shape[0])
-        # 将最大值保存到输出图中
+        # Save maximum value to output map
         flat_output[indices,ix] = flat_pred[indices,ix]
 
-        # 计算抑制区域
-        # 将一维索引转换为二维坐标
+        # Calculate suppression region
+        # Convert 1D index to 2D coordinates
         y = ix / shape[-1]
         x = ix % shape[-1]
-        mu = torch.stack([x,y], dim=1).float() # 将x,y坐标堆叠成(batch_size, 2)形状的张量
+        mu = torch.stack([x,y], dim=1).float() # Stack x,y coordinates into tensor of shape (batch_size, 2)
 
-        # 生成以最大值为中心的抑制掩码
+        # Generate suppression mask centered at maximum
         g = neighborhoods(mu, shape[-1], shape[-2], sigma, gaussian=gaussian)
 
-        # 抑制靠近中心极大值的区域
+        # Suppress regions near center maximum
         supp_pred *= (1-g.unsqueeze(1))
 
-    # 确保没有负值
+    # Ensure no negative values
     output[output < 0] = 0 
     return output 
 
 
 def get_gt_nav_map(num_angles, nav_dict, scan_ids, waypoint_ids):
     ''' 
-    获取地面真值导航图，包括目标图、障碍物图和权重图
-    参数:
-        num_angles: 角度数量（通常是图像划分的数量）
-        nav_dict: 包含导航信息的字典
-        scan_ids: 扫描ID列表
-        waypoint_ids: 路径点ID列表
-    返回:
-        target: 目标图，1表示地面真值关键点，2表示忽略的索引
-        obstacle: 障碍物图
-        weight: 权重图，0表示忽略，1表示路径点/远离路径点/障碍物，(0,1)表示其他开放空间
-        source_pos: 源位置列表
-        target_pos: 目标位置列表
+    Get ground truth navigation maps, including target map, obstacle map, and weight map
+    Args:
+        num_angles: Number of angles (usually number of image divisions)
+        nav_dict: Dictionary containing navigation information
+        scan_ids: List of scan IDs
+        waypoint_ids: List of waypoint IDs
+    Returns:
+        target: Target map, 1 indicates ground truth keypoints, 2 indicates ignored indices
+        obstacle: Obstacle map
+        weight: Weight map, 0 indicates ignore, 1 indicates waypoint/far from waypoint/obstacle, (0,1) indicates other open space
+        source_pos: List of source positions
+        target_pos: List of target positions
     '''
-    bs = len(scan_ids)  # 批次大小
-    # 初始化张量
+    bs = len(scan_ids)  # Batch size
+    # Initialize tensors
     target = torch.zeros(bs, num_angles, 12)
     obstacle = torch.zeros(bs, num_angles, 12)
     weight = torch.zeros(bs, num_angles, 12)
     source_pos = []
     target_pos = []
 
-    # 为每个样本填充数据
+    # Fill data for each sample
     for i in range(bs):
         target[i] = torch.tensor(nav_dict[scan_ids[i]][waypoint_ids[i]]['target'])
         obstacle[i] = torch.tensor(nav_dict[scan_ids[i]][waypoint_ids[i]]['obstacle'])
@@ -127,14 +127,14 @@ def get_gt_nav_map(num_angles, nav_dict, scan_ids, waypoint_ids):
 
 def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=10):
     """
-    在循环中调用以创建终端进度条
-    参数:
-        iteration   - 必需  : 当前迭代次数 (Int)
-        total       - 必需  : 总迭代次数 (Int)
-        prefix      - 可选  : 前缀字符串 (Str)
-        suffix      - 可选  : 后缀字符串 (Str)
-        decimals    - 可选  : 百分比完成度中的正小数位数 (Int)
-        bar_length  - 可选  : 进度条的字符长度 (Int)
+    Call in a loop to create terminal progress bar
+    Args:
+        iteration   - Required  : Current iteration (Int)
+        total       - Required  : Total iterations (Int)
+        prefix      - Optional  : Prefix string (Str)
+        suffix      - Optional  : Suffix string (Str)
+        decimals    - Optional  : Positive number of decimals in percent complete (Int)
+        bar_length  - Optional  : Character length of bar (Int)
     """
     str_format = "{0:." + str(decimals) + "f}"
     percents = str_format.format(100 * (iteration / float(total)))
@@ -150,12 +150,12 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
 
 def save_checkpoint(epoch, net, net_optimizer, path):
     ''' 
-    保存模型检查点
-    参数:
-        epoch: 当前训练轮次
-        net: 网络模型
-        net_optimizer: 网络优化器
-        path: 保存路径
+    Save model checkpoint
+    Args:
+        epoch: Current training epoch
+        net: Network model
+        net_optimizer: Network optimizer
+        path: Save path
     '''
     states = {}
     def create_state(name, model, optimizer):
@@ -172,15 +172,15 @@ def save_checkpoint(epoch, net, net_optimizer, path):
 
 def load_checkpoint(net, net_optimizer, path):
     ''' 
-    加载模型参数（但不加载训练状态）
-    参数:
-        net: 网络模型
-        net_optimizer: 网络优化器
-        path: 检查点路径
-    返回:
-        epoch: 加载的轮次
-        net: 加载参数后的网络模型
-        net_optimizer: 加载参数后的网络优化器
+    Load model parameters (but not training state)
+    Args:
+        net: Network model
+        net_optimizer: Network optimizer
+        path: Checkpoint path
+    Returns:
+        epoch: Loaded epoch
+        net: Network model with loaded parameters
+        net_optimizer: Network optimizer with loaded parameters
     '''
     states = torch.load(path)
     def recover_state(name, model, optimizer):
@@ -200,40 +200,40 @@ def load_checkpoint(net, net_optimizer, path):
 
 def get_attention_mask(num_imgs=24, neighbor=2):
     """
-    生成Transformer注意力掩码，控制每个位置只能关注自己和邻近的位置
-    参数:
-        num_imgs: 图像数量，默认24（通常对应360度全景的划分）
-        neighbor: 每侧允许关注的邻居数量，默认2
-    返回:
-        形状为[1,1,num_imgs,num_imgs]的注意力掩码张量，1表示允许关注，0表示禁止关注
+    Generate Transformer attention mask to control each position can only attend to itself and neighboring positions
+    Args:
+        num_imgs: Number of images, default 24 (usually corresponding to 360-degree panoramic division)
+        neighbor: Number of neighbors allowed to attend to on each side, default 2
+    Returns:
+        Attention mask tensor of shape [1,1,num_imgs,num_imgs], 1 indicates allowed attention, 0 indicates forbidden attention
     """
-    assert neighbor <= 5  # 确保邻居数不超过5
+    assert neighbor <= 5  # Ensure number of neighbors doesn't exceed 5
 
-    # 初始化全零掩码矩阵
+    # Initialize all-zero mask matrix
     mask = np.zeros((num_imgs,num_imgs))
     
-    # 创建模板行，表示单个位置的注意力模式
+    # Create template row representing attention pattern for a single position
     t = np.zeros(num_imgs)
-    t[:neighbor+1] = np.ones(neighbor+1)  # 自身和右侧neighbor个位置设为1
+    t[:neighbor+1] = np.ones(neighbor+1)  # Set self and right neighbor positions to 1
     if neighbor != 0:
-        t[-neighbor:] = np.ones(neighbor)  # 左侧neighbor个位置设为1
+        t[-neighbor:] = np.ones(neighbor)  # Set left neighbor positions to 1
     
-    # 循环填充掩码矩阵的每一行
+    # Fill each row of mask matrix in a loop
     for ri in range(num_imgs):
-        mask[ri] = t  # 将当前模板填入第ri行
-        t = np.roll(t, 1)  # 循环右移模板，准备下一行
+        mask[ri] = t  # Fill current template into row ri
+        t = np.roll(t, 1)  # Circular right shift template for next row
 
-    # 返回重塑为Transformer注意力掩码格式的张量
+    # Return tensor reshaped to Transformer attention mask format
     return torch.from_numpy(mask).reshape(1,1,num_imgs,num_imgs).long()
 
 
 def load_gt_navigability(path):
     ''' 
-    加载路径点地面真值导航性数据
-    参数:
-        path: 数据文件路径前缀
-    返回:
-        all_scans_nav_map: 包含所有扫描导航图的字典
+    Load ground truth waypoint navigability data
+    Args:
+        path: Data file path prefix
+    Returns:
+        all_scans_nav_map: Dictionary containing all scan navigation maps
     '''
     all_scans_nav_map = {}
     gt_dir = glob.glob('%s*'%(path))

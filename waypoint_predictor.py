@@ -19,119 +19,119 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def setup(args):
     """
-    设置随机种子和创建实验目录
-    参数:
-        args: 命令行参数
+    Set random seeds and create experiment directories
+    Args:
+        args: Command line arguments
     """
-    torch.manual_seed(0)  # 设置PyTorch随机种子
-    random.seed(0)  # 设置Python随机种子
-    exp_log_path = './checkpoints/%s/'%(args.EXP_ID)  # 实验日志路径
-    os.makedirs(exp_log_path, exist_ok=True)  # 创建实验目录
-    exp_log_path = './checkpoints/%s/snap/'%(args.EXP_ID)  # 模型快照路径
-    os.makedirs(exp_log_path, exist_ok=True)  # 创建模型快照目录
+    torch.manual_seed(0)  # Set PyTorch random seed
+    random.seed(0)  # Set Python random seed
+    exp_log_path = './checkpoints/%s/'%(args.EXP_ID)  # Experiment log path
+    os.makedirs(exp_log_path, exist_ok=True)  # Create experiment directory
+    exp_log_path = './checkpoints/%s/snap/'%(args.EXP_ID)  # Model snapshot path
+    os.makedirs(exp_log_path, exist_ok=True)  # Create model snapshot directory
 
 class Param():
-    """参数类，处理命令行参数"""
+    """Parameters class, handles command line arguments"""
     def __init__(self):
         self.parser = argparse.ArgumentParser(description='Train waypoint predictor')
 
-        # 实验设置
-        self.parser.add_argument('--EXP_ID', type=str, default='test_0')  # 实验ID
-        self.parser.add_argument('--TRAINEVAL', type=str, default='train', help='trian or eval mode')  # 训练或评估模式
-        self.parser.add_argument('--VIS', type=int, default=0, help='visualize predicted hearmaps')  # 是否可视化预测热图
+        # Experiment settings
+        self.parser.add_argument('--EXP_ID', type=str, default='test_0')  # Experiment ID
+        self.parser.add_argument('--TRAINEVAL', type=str, default='train', help='trian or eval mode')  # Training or evaluation mode
+        self.parser.add_argument('--VIS', type=int, default=0, help='visualize predicted hearmaps')  # Whether to visualize predicted heatmaps
         # self.parser.add_argument('--LOAD_EPOCH', type=int, default=None, help='specific an epoch to load for eval')
 
-        # 模型结构参数
-        self.parser.add_argument('--ANGLES', type=int, default=24)  # 角度划分数量
-        self.parser.add_argument('--NUM_IMGS', type=int, default=24)  # 图像数量
-        self.parser.add_argument('--NUM_CLASSES', type=int, default=12)  # 类别数量
-        self.parser.add_argument('--MAX_NUM_CANDIDATES', type=int, default=5)  # 最大候选点数量
+        # Model structure parameters
+        self.parser.add_argument('--ANGLES', type=int, default=24)  # Number of angle divisions
+        self.parser.add_argument('--NUM_IMGS', type=int, default=24)  # Number of images
+        self.parser.add_argument('--NUM_CLASSES', type=int, default=12)  # Number of classes
+        self.parser.add_argument('--MAX_NUM_CANDIDATES', type=int, default=5)  # Maximum number of candidate points
 
-        self.parser.add_argument('--PREDICTOR_NET', type=str, default='TRM', help='TRM only')  # 预测网络类型
+        self.parser.add_argument('--PREDICTOR_NET', type=str, default='TRM', help='TRM only')  # Predictor network type
 
-        # 训练参数
-        self.parser.add_argument('--EPOCH', type=int, default=10)  # 训练轮数
-        self.parser.add_argument('--BATCH_SIZE', type=int, default=2)  # 批次大小
-        self.parser.add_argument('--LEARNING_RATE', type=float, default=1e-4)  # 学习率
-        self.parser.add_argument('--WEIGHT', type=int, default=0, help='weight the target map')  # 是否加权目标图
+        # Training parameters
+        self.parser.add_argument('--EPOCH', type=int, default=10)  # Number of training epochs
+        self.parser.add_argument('--BATCH_SIZE', type=int, default=2)  # Batch size
+        self.parser.add_argument('--LEARNING_RATE', type=float, default=1e-4)  # Learning rate
+        self.parser.add_argument('--WEIGHT', type=int, default=0, help='weight the target map')  # Whether to weight the target map
 
-        # Transformer模型参数
-        self.parser.add_argument('--TRM_LAYER', default=2, type=int, help='number of TRM hidden layers')  # TRM隐藏层数
-        self.parser.add_argument('--TRM_NEIGHBOR', default=2, type=int, help='number of attention mask neighbor')  # 注意力掩码邻居数
-        self.parser.add_argument('--HEATMAP_OFFSET', default=2, type=int, help='an offset determined by image FoV and number of images')  # 热图偏移量
-        self.parser.add_argument('--HIDDEN_DIM', default=768, type=int)  # 隐藏层维度
+        # Transformer model parameters
+        self.parser.add_argument('--TRM_LAYER', default=2, type=int, help='number of TRM hidden layers')  # Number of TRM hidden layers
+        self.parser.add_argument('--TRM_NEIGHBOR', default=2, type=int, help='number of attention mask neighbor')  # Number of attention mask neighbors
+        self.parser.add_argument('--HEATMAP_OFFSET', default=2, type=int, help='an offset determined by image FoV and number of images')  # Heatmap offset
+        self.parser.add_argument('--HIDDEN_DIM', default=768, type=int)  # Hidden dimension size
 
         self.args = self.parser.parse_args()
 
 def predict_waypoints(args):
     """
-    路径点预测主函数
-    参数:
-        args: 命令行参数
+    Main function for waypoint prediction
+    Args:
+        args: Command line arguments
     """
     print('\nArguments', args)
-    log_dir = './checkpoints/%s/tensorboard/'%(args.EXP_ID)  # TensorBoard日志目录
-    writer = SummaryWriter(log_dir=log_dir)  # 创建TensorBoard写入器
+    log_dir = './checkpoints/%s/tensorboard/'%(args.EXP_ID)  # TensorBoard log directory
+    writer = SummaryWriter(log_dir=log_dir)  # Create TensorBoard writer
 
-    ''' 初始化网络模型 '''
-    # 初始化RGB编码器，使用预训练权重，不进行微调
+    ''' Initialize network models '''
+    # Initialize RGB encoder, using pretrained weights, without fine-tuning
     rgb_encoder = RGBEncoder(resnet_pretrain=True, trainable=False).to(device)
-    # 初始化深度编码器，使用预训练权重，不进行微调
+    # Initialize depth encoder, using pretrained weights, without fine-tuning
     depth_encoder = DepthEncoder(resnet_pretrain=True, trainable=False).to(device)
     if args.PREDICTOR_NET == 'TRM':
         print('\nUsing TRM predictor')
         print('HIDDEN_DIM default to 768')
         args.HIDDEN_DIM = 768
-        # 初始化基于Transformer的二元分布预测器
+        # Initialize Transformer-based binary distribution predictor
         predictor = BinaryDistPredictor_TRM(args=args,
             hidden_dim=args.HIDDEN_DIM, n_classes=args.NUM_CLASSES).to(device)
 
-    ''' 加载可导航性数据（地面真值路径点、障碍物和权重） '''
+    ''' Load navigability data (ground truth waypoints, obstacles, and weights) '''
     navigability_dict = utils.load_gt_navigability(
         './training_data/%s_*_mp3d_waypoint_twm0.2_obstacle_first_withpos.json'%(args.ANGLES))
 
-    ''' 为RGB和深度图像创建数据加载器 '''
-    train_img_dir = './gen_training_data/rgbd_fov90/train/*/*.pkl'  # 训练图像目录
-    traindataloader = RGBDepthPano(args, train_img_dir, navigability_dict)  # 训练数据加载器
-    eval_img_dir = './gen_training_data/rgbd_fov90/val_unseen/*/*.pkl'  # 评估图像目录
-    evaldataloader = RGBDepthPano(args, eval_img_dir, navigability_dict)  # 评估数据加载器
+    ''' Create data loaders for RGB and depth images '''
+    train_img_dir = './gen_training_data/rgbd_fov90/train/*/*.pkl'  # Training image directory
+    traindataloader = RGBDepthPano(args, train_img_dir, navigability_dict)  # Training data loader
+    eval_img_dir = './gen_training_data/rgbd_fov90/val_unseen/*/*.pkl'  # Evaluation image directory
+    evaldataloader = RGBDepthPano(args, eval_img_dir, navigability_dict)  # Evaluation data loader
     if args.TRAINEVAL == 'train':
         trainloader = torch.utils.data.DataLoader(traindataloader, 
-        batch_size=args.BATCH_SIZE, shuffle=True, num_workers=4)  # 训练数据批次加载器
+        batch_size=args.BATCH_SIZE, shuffle=True, num_workers=4)  # Training batch data loader
     evalloader = torch.utils.data.DataLoader(evaldataloader, 
-        batch_size=args.BATCH_SIZE, shuffle=False, num_workers=4)  # 评估数据批次加载器
+        batch_size=args.BATCH_SIZE, shuffle=False, num_workers=4)  # Evaluation batch data loader
 
-    ''' 定义损失函数和优化器 '''
-    criterion_bcel = torch.nn.BCEWithLogitsLoss(reduction='none')  # 二元交叉熵损失
-    criterion_mse = torch.nn.MSELoss(reduction='none')  # 均方误差损失
+    ''' Define loss functions and optimizer '''
+    criterion_bcel = torch.nn.BCEWithLogitsLoss(reduction='none')  # Binary cross entropy loss
+    criterion_mse = torch.nn.MSELoss(reduction='none')  # Mean squared error loss
 
-    params = list(predictor.parameters())  # 获取预测器参数
-    optimizer = torch.optim.AdamW(params, lr=args.LEARNING_RATE)  # 使用AdamW优化器
+    params = list(predictor.parameters())  # Get predictor parameters
+    optimizer = torch.optim.AdamW(params, lr=args.LEARNING_RATE)  # Use AdamW optimizer
 
-    ''' 训练循环 '''
+    ''' Training loop '''
     if args.TRAINEVAL == 'train':
         print('\nTraining starts')
-        # 记录最佳验证结果
-        best_val_1 = {"avg_wayscore": 0.0, "log_string": '', "update":False}  # 基于平均路径点得分的最佳结果
-        best_val_2 = {"avg_pred_distance": 10.0, "log_string": '', "update":False}  # 基于平均预测距离的最佳结果
+        # Record best validation results
+        best_val_1 = {"avg_wayscore": 0.0, "log_string": '', "update":False}  # Best result based on average waypoint score
+        best_val_2 = {"avg_pred_distance": 10.0, "log_string": '', "update":False}  # Best result based on average prediction distance
 
-        for epoch in range(args.EPOCH):  # 遍历每个训练轮次
-            sum_loss = 0.0  # 累计损失
+        for epoch in range(args.EPOCH):  # Loop through each training epoch
+            sum_loss = 0.0  # Accumulated loss
 
-            # 设置编码器为评估模式（不更新参数）
+            # Set encoders to evaluation mode (parameters not updated)
             rgb_encoder.eval()
             depth_encoder.eval()
-            # 设置预测器为训练模式
+            # Set predictor to training mode
             predictor.train()
 
-            # 遍历训练数据
+            # Iterate through training data
             for i, data in enumerate(trainloader):
-                scan_ids = data['scan_id']  # 场景ID
-                waypoint_ids = data['waypoint_id']  # 路径点ID
-                rgb_imgs = data['rgb'].to(device)  # RGB图像
-                depth_imgs = data['depth'].to(device)  # 深度图像
+                scan_ids = data['scan_id']  # Scene IDs
+                waypoint_ids = data['waypoint_id']  # Waypoint IDs
+                rgb_imgs = data['rgb'].to(device)  # RGB images
+                depth_imgs = data['depth'].to(device)  # Depth images
 
-                ''' 检查图像方向（已注释代码） '''
+                ''' Check image orientation (commented code) '''
                 # from PIL import Image
                 # from matplotlib import pyplot
                 # import numpy as np
@@ -150,57 +150,57 @@ def predict_waypoints(args):
                 #     im = Image.fromarray(out_depth_i)
                 #     im.save("./play/depth_%s.png"%(kk))
 
-                ''' 处理观察数据 '''
-                rgb_feats = rgb_encoder(rgb_imgs)        # 提取RGB特征 (BATCH_SIZE*ANGLES, 2048)
-                depth_feats = depth_encoder(depth_imgs)  # 提取深度特征 (BATCH_SIZE*ANGLES, 128, 4, 4)
+                ''' Process observation data '''
+                rgb_feats = rgb_encoder(rgb_imgs)        # Extract RGB features (BATCH_SIZE*ANGLES, 2048)
+                depth_feats = depth_encoder(depth_imgs)  # Extract depth features (BATCH_SIZE*ANGLES, 128, 4, 4)
 
-                ''' 获取学习目标 '''
-                # 获取地面真值导航图（目标、障碍物、权重）
+                ''' Get learning targets '''
+                # Get ground truth navigation maps (target, obstacle, weight)
                 target, obstacle, weight, _, _ = utils.get_gt_nav_map(
                     args.ANGLES, navigability_dict, scan_ids, waypoint_ids)
                 target = target.to(device)
                 obstacle = obstacle.to(device)
                 weight = weight.to(device)
 
-                # 使用TRM预测器进行预测
+                # Use TRM predictor for prediction
                 if args.PREDICTOR_NET == 'TRM':
                     vis_logits = TRM_predict('train', args,
                         predictor, rgb_feats, depth_feats)
 
-                    # 计算损失
+                    # Calculate loss
                     loss_vis = criterion_mse(vis_logits, target)
                     if args.WEIGHT:
-                        loss_vis = loss_vis * weight  # 如果启用加权，应用权重
-                    total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES  # 计算总损失
+                        loss_vis = loss_vis * weight  # Apply weights if enabled
+                    total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES  # Calculate total loss
 
-                # 反向传播和优化
-                optimizer.zero_grad()  # 清除梯度
-                total_loss.backward()  # 反向传播
-                optimizer.step()  # 更新参数
-                sum_loss += total_loss.item()  # 累加损失
+                # Backpropagation and optimization
+                optimizer.zero_grad()  # Clear gradients
+                total_loss.backward()  # Backpropagation
+                optimizer.step()  # Update parameters
+                sum_loss += total_loss.item()  # Accumulate loss
 
-                # 打印训练进度
+                # Print training progress
                 print_progress(i+1, len(trainloader), prefix='Epoch: %d/%d'%((epoch+1),args.EPOCH))
             
-            # 记录训练损失到TensorBoard
+            # Record training loss to TensorBoard
             writer.add_scalar("Train/Loss", sum_loss/(i+1), epoch)
-            print('Train Loss: %.5f' % (sum_loss/(i+1)))  # 打印平均训练损失
+            print('Train Loss: %.5f' % (sum_loss/(i+1)))  # Print average training loss
 
-            ''' 评估阶段 '''
+            ''' Evaluation phase '''
             # print('Evaluation ...')
-            sum_loss = 0.0  # 评估损失
-            # 存储预测结果
+            sum_loss = 0.0  # Evaluation loss
+            # Store prediction results
             predictions = {'sample_id': [], 
                 'source_pos': [], 'target_pos': [],
                 'probs': [], 'logits': [],
                 'target': [], 'obstacle': [], 'sample_loss': []}
 
-            # 设置所有网络为评估模式
+            # Set all networks to evaluation mode
             rgb_encoder.eval()
             depth_encoder.eval()
             predictor.eval()
 
-            # 遍历评估数据
+            # Iterate through evaluation data
             for i, data in enumerate(evalloader):
                 scan_ids = data['scan_id']
                 waypoint_ids = data['waypoint_id']
@@ -208,7 +208,7 @@ def predict_waypoints(args):
                 rgb_imgs = data['rgb'].to(device)
                 depth_imgs = data['depth'].to(device)
 
-                # 获取地面真值导航图
+                # Get ground truth navigation maps
                 target, obstacle, weight, \
                 source_pos, target_pos = utils.get_gt_nav_map(
                     args.ANGLES, navigability_dict, scan_ids, waypoint_ids)
@@ -216,25 +216,25 @@ def predict_waypoints(args):
                 obstacle = obstacle.to(device)
                 weight = weight.to(device)
 
-                ''' 处理观察数据 '''
-                rgb_feats = rgb_encoder(rgb_imgs)        # 提取RGB特征
-                depth_feats = depth_encoder(depth_imgs)  # 提取深度特征
+                ''' Process observation data '''
+                rgb_feats = rgb_encoder(rgb_imgs)        # Extract RGB features
+                depth_feats = depth_encoder(depth_imgs)  # Extract depth features
 
-                # 使用TRM预测器进行预测
+                # Use TRM predictor for prediction
                 if args.PREDICTOR_NET == 'TRM':
                     vis_probs, vis_logits = TRM_predict('eval', args,
                         predictor, rgb_feats, depth_feats)
-                    overall_probs = vis_probs  # 总体概率
-                    overall_logits = vis_logits  # 总体逻辑值
+                    overall_probs = vis_probs  # Overall probabilities
+                    overall_logits = vis_logits  # Overall logits
                     
-                    # 计算损失
+                    # Calculate loss
                     loss_vis = criterion_mse(vis_logits, target)
                     if args.WEIGHT:
-                        loss_vis = loss_vis * weight  # 如果启用加权，应用权重
-                    sample_loss = loss_vis.sum(-1).sum(-1) / args.ANGLES  # 样本损失
-                    total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES  # 总损失
+                        loss_vis = loss_vis * weight  # Apply weights if enabled
+                    sample_loss = loss_vis.sum(-1).sum(-1) / args.ANGLES  # Sample loss
+                    total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES  # Total loss
 
-                # 累加损失并存储预测结果
+                # Accumulate loss and store prediction results
                 sum_loss += total_loss.item()
                 predictions['sample_id'].append(sample_id)
                 predictions['source_pos'].append(source_pos)
@@ -245,26 +245,26 @@ def predict_waypoints(args):
                 predictions['obstacle'].append(obstacle.tolist())
                 predictions['sample_loss'].append(target.tolist())
 
-            # 打印评估损失
+            # Print evaluation loss
             print('Eval Loss: %.5f' % (sum_loss/(i+1)))
-            # 评估预测结果
+            # Evaluate prediction results
             results = waypoint_eval(args, predictions)
             
-            # 记录评估指标到TensorBoard
+            # Record evaluation metrics to TensorBoard
             writer.add_scalar("Evaluation/Loss", sum_loss/(i+1), epoch)
             writer.add_scalar("Evaluation/p_waypoint_openspace", results['p_waypoint_openspace'], epoch)
             writer.add_scalar("Evaluation/p_waypoint_obstacle", results['p_waypoint_obstacle'], epoch)
             writer.add_scalar("Evaluation/avg_wayscore", results['avg_wayscore'], epoch)
             writer.add_scalar("Evaluation/avg_pred_distance", results['avg_pred_distance'], epoch)
             
-            # 构建日志字符串
+            # Build log string
             log_string = 'Epoch %s '%(epoch)
             for key, value in results.items():
                 if key != 'candidates': 
                     log_string += '{} {:.5f} | '.format(str(key), value)
-            print(log_string)  # 打印评估结果
+            print(log_string)  # Print evaluation results
 
-            # 保存检查点 - 基于平均路径点得分
+            # Save checkpoint - based on average waypoint score
             if results['avg_wayscore'] > best_val_1['avg_wayscore']:
                 checkpoint_save_path = './checkpoints/%s/snap/check_val_best_avg_wayscore'%(args.EXP_ID)
                 utils.save_checkpoint(epoch+1, predictor, optimizer, checkpoint_save_path)
@@ -272,12 +272,12 @@ def predict_waypoints(args):
                 best_val_1['avg_wayscore'] = results['avg_wayscore']
                 best_val_1['log_string'] = log_string
             
-            # 保存最新检查点
+            # Save latest checkpoint
             checkpoint_reg_save_path = './checkpoints/%s/snap/check_latest'%(args.EXP_ID)
             utils.save_checkpoint(epoch+1, predictor, optimizer, checkpoint_reg_save_path)
             print('Best avg_wayscore result til now: ', best_val_1['log_string'])
 
-            # 保存检查点 - 基于平均预测距离
+            # Save checkpoint - based on average prediction distance
             if results['avg_pred_distance'] < best_val_2['avg_pred_distance']:
                 checkpoint_save_path = './checkpoints/%s/snap/check_val_best_avg_pred_distance'%(args.EXP_ID)
                 utils.save_checkpoint(epoch+1, predictor, optimizer, checkpoint_save_path)
@@ -285,34 +285,34 @@ def predict_waypoints(args):
                 best_val_2['avg_pred_distance'] = results['avg_pred_distance']
                 best_val_2['log_string'] = log_string
             
-            # 再次保存最新检查点（冗余操作）
+            # Save latest checkpoint again (redundant operation)
             checkpoint_reg_save_path = './checkpoints/%s/snap/check_latest'%(args.EXP_ID)
             utils.save_checkpoint(epoch+1, predictor, optimizer, checkpoint_reg_save_path)
             print('Best avg_pred_distance result til now: ', best_val_2['log_string'])
 
     elif args.TRAINEVAL == 'eval':
-        ''' 评估模式 - 推理（带有一点专家混合） '''
+        ''' Evaluation mode - inference (with a bit of expert mixing) '''
         print('\nEvaluation mode, please doublecheck EXP_ID and LOAD_EPOCH')
-        # 加载最佳检查点
+        # Load best checkpoint
         checkpoint_load_path = './checkpoints/%s/snap/check_val_best_avg_wayscore'%(args.EXP_ID)
         epoch, predictor, optimizer = utils.load_checkpoint(
                         predictor, optimizer, checkpoint_load_path)
 
         sum_loss = 0.0
-        # 存储预测结果
+        # Store prediction results
         predictions = {'sample_id': [], 
             'source_pos': [], 'target_pos': [],
             'probs': [], 'logits': [],
             'target': [], 'obstacle': [], 'sample_loss': []}
 
-        # 设置所有网络为评估模式
+        # Set all networks to evaluation mode
         rgb_encoder.eval()
         depth_encoder.eval()
         predictor.eval()
 
-        # 遍历评估数据
+        # Iterate through evaluation data
         for i, data in enumerate(evalloader):
-            # 如果启用可视化并且已处理5个样本，则跳出循环
+            # If visualization is enabled and 5 samples have been processed, break the loop
             if args.VIS and i == 5:
                 break
 
@@ -322,7 +322,7 @@ def predict_waypoints(args):
             rgb_imgs = data['rgb'].to(device)
             depth_imgs = data['depth'].to(device)
 
-            # 获取地面真值导航图
+            # Get ground truth navigation maps
             target, obstacle, weight, \
             source_pos, target_pos = utils.get_gt_nav_map(
                 args.ANGLES, navigability_dict, scan_ids, waypoint_ids)
@@ -330,11 +330,11 @@ def predict_waypoints(args):
             obstacle = obstacle.to(device)
             weight = weight.to(device)
 
-            ''' 处理观察数据 '''
-            rgb_feats = rgb_encoder(rgb_imgs)        # 提取RGB特征
-            depth_feats = depth_encoder(depth_imgs)  # 提取深度特征
+            ''' Process observation data '''
+            rgb_feats = rgb_encoder(rgb_imgs)        # Extract RGB features
+            depth_feats = depth_encoder(depth_imgs)  # Extract depth features
 
-            ''' 预测路径点概率 '''
+            ''' Predict waypoint probabilities '''
             if args.PREDICTOR_NET == 'TRM':
                 vis_probs, vis_logits = TRM_predict('eval', args,
                     predictor, rgb_feats, depth_feats)
@@ -347,7 +347,7 @@ def predict_waypoints(args):
                 sample_loss = loss_vis.sum(-1).sum(-1) / args.ANGLES
                 total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES
 
-            # 累加损失并存储预测结果
+            # Accumulate loss and store prediction results
             sum_loss += total_loss.item()
             predictions['sample_id'].append(sample_id)
             predictions['source_pos'].append(source_pos)
@@ -358,12 +358,12 @@ def predict_waypoints(args):
             predictions['obstacle'].append(obstacle.tolist())
             predictions['sample_loss'].append(target.tolist())
 
-        # 打印评估损失
+        # Print evaluation loss
         print('Eval Loss: %.5f' % (sum_loss/(i+1)))
-        # 评估预测结果
+        # Evaluate prediction results
         results = waypoint_eval(args, predictions)
         
-        # 构建日志字符串
+        # Build log string
         log_string = 'Epoch %s '%(epoch)
         for key, value in results.items():
             if key != 'candidates':
@@ -372,15 +372,15 @@ def predict_waypoints(args):
         print('Evaluation Done')
 
     else:
-        RunningModeError  # 运行模式错误
+        RunningModeError  # Running mode error
 
 if __name__ == "__main__":
-    param = Param()  # 创建参数对象
-    args = param.args  # 获取命令行参数
-    setup(args)  # 设置实验环境
+    param = Param()  # Create parameter object
+    args = param.args  # Get command line arguments
+    setup(args)  # Setup experiment environment
 
-    # 如果启用可视化，确保是评估模式
+    # If visualization is enabled, ensure it's in evaluation mode
     if args.VIS:
         assert args.TRAINEVAL == 'eval'
 
-    predict_waypoints(args)  # 执行路径点预测
+    predict_waypoints(args)  # Execute waypoint prediction
