@@ -69,7 +69,7 @@ class DepthEncoder(nn.Module):
         if resnet_pretrain:
             print('Loading PointNav pre-trained Resnet50 for Depth ...')
             # Load PointNav pre-trained weights
-            ddppo_pn_depth_encoder_weights = torch.load('../data/ddppo-models/gibson-2plus-resnet50.pth')
+            ddppo_pn_depth_encoder_weights = torch.load('./data/ddppo-models/gibson-2plus-resnet50.pth')
             # Extract weights related to visual encoder
             weights_dict = {}
             for k, v in ddppo_pn_depth_encoder_weights["state_dict"].items():

@@ -75,10 +75,10 @@ class BinaryDistPredictor_TRM(nn.Module):
 
         layer_norm_eps = config.layer_norm_eps
         # Layer normalization (commented out)
-        # self.mergefeats_LayerNorm = BertLayerNorm(
+        #self.mergefeats_LayerNorm = BertLayerNorm(
         #     hidden_dim,
         #     eps=layer_norm_eps
-        # )
+        #)
 
         # Create attention mask to control information flow in Transformer
         self.mask = utils.get_attention_mask(

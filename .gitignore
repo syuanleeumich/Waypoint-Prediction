@@ -1,5 +1,8 @@
+data
+logs
 training_data
 gen_training_data/nav_dicts
 gen_training_data/raw_graphs
 __pycache__
 checkpoints
+sbatch

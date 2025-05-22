@@ -4,14 +4,15 @@ import utils
 import habitat
 from habitat.sims import make_sim
 from utils import Simulator
+import os
 
 # 配置文件和路径设置
 config_path = 'gen_training_data/config.yaml'  # Habitat配置文件路径
-scene_path = '../data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
-RAW_GRAPH_PATH= '../data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
+scene_path = './data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
+RAW_GRAPH_PATH= './data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
 NUMBER = 120  # 角度划分数量，将360度划分为120个角度
 
-SPLIT = 'val_unseen'  # 数据集划分（未见验证集）
+SPLIT = 'train'  # 数据集划分（未见验证集）
 
 # 加载连接图数据
 with open(RAW_GRAPH_PATH%SPLIT, 'r') as f:
@@ -100,5 +101,7 @@ for scene, data in raw_graph_data.items():
 
 # 保存导航字典到文件
 output_path = './gen_training_data/nav_dicts/navigability_dict_%s.json'%SPLIT
+# 确保输出目录存在
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
 with open(output_path, 'w') as fo:
     json.dump(nav_dict, fo, ensure_ascii=False, indent=4)

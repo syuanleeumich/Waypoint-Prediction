@@ -1,5 +1,5 @@
 
-flag="--EXP_ID wp-train
+flag="--EXP_ID train_0
 
       --TRAINEVAL train
       --VIS 0

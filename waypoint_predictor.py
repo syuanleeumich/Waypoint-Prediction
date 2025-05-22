@@ -87,13 +87,19 @@ def predict_waypoints(args):
             hidden_dim=args.HIDDEN_DIM, n_classes=args.NUM_CLASSES).to(device)
 
     ''' Load navigability data (ground truth waypoints, obstacles, and weights) '''
-    navigability_dict = utils.load_gt_navigability(
-        './training_data/%s_*_mp3d_waypoint_twm0.2_obstacle_first_withpos.json'%(args.ANGLES))
+    nav_dict_path = './training_data/%s_*_mp3d_waypoint_twm0.2_obstacle_first_withpos.json'%(args.ANGLES)
+
+    #navigability_dict = utils.load_gt_navigability(
+    #    './training_data/%s_*_mp3d_waypoint_twm0.2_obstacle_first_withpos.json'%(args.ANGLES))
+    navigability_dict = utils.load_gt_navigability(nav_dict_path)
+    #print("\nNavigability dictionary keys:")
+    #for key in navigability_dict.keys():
+        #print(key)
 
     ''' Create data loaders for RGB and depth images '''
-    train_img_dir = './gen_training_data/rgbd_fov90/train/*/*.pkl'  # Training image directory
+    train_img_dir = './training_data/rgbd_fov90/train/*/*.pkl'  # Training image directory
     traindataloader = RGBDepthPano(args, train_img_dir, navigability_dict)  # Training data loader
-    eval_img_dir = './gen_training_data/rgbd_fov90/val_unseen/*/*.pkl'  # Evaluation image directory
+    eval_img_dir = './training_data/rgbd_fov90/val_unseen/*/*.pkl'  # Evaluation image directory
     evaldataloader = RGBDepthPano(args, eval_img_dir, navigability_dict)  # Evaluation data loader
     if args.TRAINEVAL == 'train':
         trainloader = torch.utils.data.DataLoader(traindataloader, 
@@ -294,7 +300,7 @@ def predict_waypoints(args):
         ''' Evaluation mode - inference (with a bit of expert mixing) '''
         print('\nEvaluation mode, please doublecheck EXP_ID and LOAD_EPOCH')
         # Load best checkpoint
-        checkpoint_load_path = './checkpoints/%s/snap/check_val_best_avg_wayscore'%(args.EXP_ID)
+        checkpoint_load_path = './checkpoints/%s/snap/check_cwp_bestdist_hfov90'%(args.EXP_ID)
         epoch, predictor, optimizer = utils.load_checkpoint(
                         predictor, optimizer, checkpoint_load_path)
 

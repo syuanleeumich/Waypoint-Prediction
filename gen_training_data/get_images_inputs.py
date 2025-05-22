@@ -9,13 +9,13 @@ from habitat.sims import make_sim
 
 # 配置文件和路径设置
 config_path = './gen_training_data/config.yaml'  # Habitat配置文件路径
-scene_path = '../data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
+scene_path = './data/scene_datasets/mp3d/{scan}/{scan}.glb'  # 3D场景模型路径模板
 image_path = './training_data/rgbd_fov90/'  # 保存RGB-D图像的基础路径
 save_path = os.path.join(image_path,'{split}/{scan}/{scan}_{node}_mp3d_imgs.pkl')  # 保存图像的具体路径模板
-RAW_GRAPH_PATH= '../data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
+RAW_GRAPH_PATH= './data/adapted_mp3d_connectivity_graphs/%s.json'  # 连接图数据路径模板
 NUMBER = 12  # 每个节点采集的图像数量（对应不同视角）
 
-SPLIT = 'train'  # 数据集划分（训练集）
+SPLIT = 'val_unseen'  # 数据集划分（训练集）
 
 # 加载连接图数据
 with open(RAW_GRAPH_PATH%SPLIT, 'r') as f:
@@ -43,6 +43,7 @@ for scene, data in raw_graph_data.items():
         else:
             connect_dict[node_b].append(node_a)
 
+
     '''创建Habitat模拟器实例用于障碍物检查'''
     config = habitat.get_config(config_path)  # 加载配置
     config.defrost()  # 解冻配置以进行修改
@@ -58,7 +59,7 @@ for scene, data in raw_graph_data.items():
     if not os.path.exists(image_path+'{split}/{scan}'.format(split=SPLIT,scan=scene)):
         os.makedirs(image_path+'{split}/{scan}'.format(split=SPLIT,scan=scene))
     navigability_dict = {}  # 可导航性字典
-    
+    total = len(connect_dict)
     i = 0  # 节点计数器
     # 遍历每个节点及其邻居
     for node_a, neighbors in connect_dict.items():
