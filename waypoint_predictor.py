@@ -30,6 +30,26 @@ def setup(args):
     exp_log_path = './checkpoints/%s/snap/'%(args.EXP_ID)  # Model snapshot path
     os.makedirs(exp_log_path, exist_ok=True)  # Create model snapshot directory
 
+def find_obstacle_indices(obstacle):
+    """
+    Find the first indices of obstacle pixels in the obstacle map
+    Args:
+        obstacle: Obstacle map tensor
+    Returns:
+        List of indices where obstacles are present
+    """
+    num_classes = obstacle.size(-1)
+    non_zero_mask = obstacle != 0  # Create a mask for non-zero elements
+
+    # Convert boolean mask to int 
+    non_zero_int = non_zero_mask.int()
+
+    # use argmax to find the index of the first non-zero value 
+    first_non_zero_idx = non_zero_int.argmax(dim=-1)  # Get the index of the first non-zero value along the last dimension
+    has_non_zero = non_zero_mask.any(dim=-1)  # Check if there are any non-zero values along the last dimension
+    first_non_zero_idx[~has_non_zero] = num_classes  # If no non-zero values, set index to 0
+    return first_non_zero_idx
+
 class Param():
     """Parameters class, handles command line arguments"""
     def __init__(self):
@@ -110,6 +130,7 @@ def predict_waypoints(args):
     ''' Define loss functions and optimizer '''
     criterion_bcel = torch.nn.BCEWithLogitsLoss(reduction='none')  # Binary cross entropy loss
     criterion_mse = torch.nn.MSELoss(reduction='none')  # Mean squared error loss
+    criterion_cls = torch.nn.CrossEntropyLoss(label_smoothing=0.1, reduction='none')  # Cross entropy loss
 
     params = list(predictor.parameters())  # Get predictor parameters
     optimizer = torch.optim.AdamW(params, lr=args.LEARNING_RATE)  # Use AdamW optimizer
@@ -165,19 +186,22 @@ def predict_waypoints(args):
                 target, obstacle, weight, _, _ = utils.get_gt_nav_map(
                     args.ANGLES, navigability_dict, scan_ids, waypoint_ids)
                 target = target.to(device)
-                obstacle = obstacle.to(device)
+                obstacle = obstacle.to(device) # [batch_size, num_angles, num_distances]
                 weight = weight.to(device)
-
+                obstacle_indices = find_obstacle_indices(obstacle)  # Find obstacle indices
                 # Use TRM predictor for prediction
                 if args.PREDICTOR_NET == 'TRM':
-                    vis_logits = TRM_predict('train', args,
+                    vis_logits, obs_logits = TRM_predict('train', args,
                         predictor, rgb_feats, depth_feats)
 
                     # Calculate loss
                     loss_vis = criterion_mse(vis_logits, target)
                     if args.WEIGHT:
                         loss_vis = loss_vis * weight  # Apply weights if enabled
+                    num_classes = obs_logits.size(-1)  # Number of classes in obstacle logits
+                    loss_obs = criterion_cls(obs_logits.reshape(-1, num_classes), obstacle_indices.reshape(-1))  # Obstacle loss
                     total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES  # Calculate total loss
+                    total_loss += 10 * loss_obs.sum() / obs_logits.size(0) / args.ANGLES  # Add obstacle loss to total loss
 
                 # Backpropagation and optimization
                 optimizer.zero_grad()  # Clear gradients
@@ -220,6 +244,7 @@ def predict_waypoints(args):
                     args.ANGLES, navigability_dict, scan_ids, waypoint_ids)
                 target = target.to(device)
                 obstacle = obstacle.to(device)
+                obstacle_indices = find_obstacle_indices(obstacle)  # Find obstacle indices
                 weight = weight.to(device)
 
                 ''' Process observation data '''
@@ -228,17 +253,20 @@ def predict_waypoints(args):
 
                 # Use TRM predictor for prediction
                 if args.PREDICTOR_NET == 'TRM':
-                    vis_probs, vis_logits = TRM_predict('eval', args,
+                    vis_probs, vis_logits, obs_probs, obs_logits = TRM_predict('eval', args,
                         predictor, rgb_feats, depth_feats)
                     overall_probs = vis_probs  # Overall probabilities
                     overall_logits = vis_logits  # Overall logits
                     
                     # Calculate loss
                     loss_vis = criterion_mse(vis_logits, target)
+                    loss_obs = criterion_cls(obs_logits.reshape(-1, obs_logits.size(-1)), 
+                        obstacle_indices.reshape(-1))
                     if args.WEIGHT:
                         loss_vis = loss_vis * weight  # Apply weights if enabled
                     sample_loss = loss_vis.sum(-1).sum(-1) / args.ANGLES  # Sample loss
                     total_loss = loss_vis.sum() / vis_logits.size(0) / args.ANGLES  # Total loss
+                    total_loss += 10 * loss_obs.sum() / obs_logits.size(0) / args.ANGLES  # Add obstacle loss to total loss
 
                 # Accumulate loss and store prediction results
                 sum_loss += total_loss.item()

@@ -11,15 +11,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def TRM_predict(mode, args, predictor, rgb_feats, depth_feats):
     ''' Predict waypoint probabilities '''
     # Use predictor model to get visual logits
-    vis_logits = predictor(rgb_feats, depth_feats)
+    vis_logits, obs_logits = predictor(rgb_feats, depth_feats)
     # Element-wise probability (use sigmoid activation to convert logits to probabilities between 0-1)
     vis_probs = torch.sigmoid(vis_logits)
-
+    obs_probs = torch.softmax(obs_logits, dim=-1)  # Softmax for observation logits
     # Return different results based on mode
     if mode == 'train':
-        return vis_logits  # Training mode returns logits for loss calculation
+        return vis_logits, obs_logits  # Training mode returns logits for loss calculation
     elif mode == 'eval':
-        return vis_probs, vis_logits  # Evaluation mode returns both probabilities and logits
+        return vis_probs, vis_logits, obs_probs, obs_logits  # Evaluation mode returns both probabilities and logits
 
 
 class BinaryDistPredictor_TRM(nn.Module):
@@ -92,6 +92,11 @@ class BinaryDistPredictor_TRM(nn.Module):
             nn.Linear(hidden_dim,
                 int(n_classes*(self.num_angles/self.num_imgs))),  # Output dimension adapted to angles and classes
         )
+        self.obs_classifier = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, (n_classes+1)*int(self.num_angles/self.num_imgs)),  # Output dimension adapted to angles and classes
+        )
 
     def forward(self, rgb_feats, depth_feats):
         """
@@ -128,7 +133,13 @@ class BinaryDistPredictor_TRM(nn.Module):
         vis_rel_x = self.waypoint_TRM(
             vis_x, attention_mask=attention_mask
         )
-
+        # Apply obs classifier to get logits 
+        obs_logits = self.obs_classifier(vis_rel_x)
+        obs_logits = obs_logits.reshape(
+            bsi, self.num_angles, self.n_classes + 1)
+        obs_logits = torch.cat(
+            (obs_logits[:,self.args.HEATMAP_OFFSET:,:], obs_logits[:,:self.args.HEATMAP_OFFSET,:]),
+            dim=1)
         # Apply visual classifier to get logits
         vis_logits = self.vis_classifier(vis_rel_x)
         # Reshape to [bsi, num_angles, n_classes]
@@ -141,7 +152,7 @@ class BinaryDistPredictor_TRM(nn.Module):
             (vis_logits[:,self.args.HEATMAP_OFFSET:,:], vis_logits[:,:self.args.HEATMAP_OFFSET,:]),
             dim=1)
 
-        return vis_logits
+        return vis_logits, obs_logits
 
 
 class BertLayerNorm(nn.Module):
