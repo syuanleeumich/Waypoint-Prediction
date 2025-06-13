@@ -53,7 +53,7 @@ predictor = BinaryDistPredictor_TRM(args=args, hidden_dim=args.HIDDEN_DIM, n_cla
 nav_dict_path = './training_data/%s_*_mp3d_waypoint_twm0.2_obstacle_first_withpos.json'%(args.ANGLES)
 navigability_dict = utils.load_gt_navigability(nav_dict_path)
 eval_img_dir = './training_data/rgbd_fov90/val_unseen/*/*.pkl'  # Evaluation image directory
-evaldataloader = RGBDepthPano(args, eval_img_dir, navigability_dict)  # Evaluation data loader
+evaldataloader = RGBDepthPano(args.NUM_IMGS, eval_img_dir, navigability_dict)  # Evaluation data loader
 evalloader = torch.utils.data.DataLoader(evaldataloader, 
         batch_size=args.BATCH_SIZE, shuffle=False, num_workers=4) 
 raw_graph_data = {}

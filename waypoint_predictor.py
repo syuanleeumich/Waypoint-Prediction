@@ -118,9 +118,9 @@ def predict_waypoints(args):
 
     ''' Create data loaders for RGB and depth images '''
     train_img_dir = './training_data/rgbd_fov90/train/*/*.pkl'  # Training image directory
-    traindataloader = RGBDepthPano(args, train_img_dir, navigability_dict)  # Training data loader
+    traindataloader = RGBDepthPano(args.NUM_IMGS, train_img_dir, navigability_dict)  # Training data loader
     eval_img_dir = './training_data/rgbd_fov90/val_unseen/*/*.pkl'  # Evaluation image directory
-    evaldataloader = RGBDepthPano(args, eval_img_dir, navigability_dict)  # Evaluation data loader
+    evaldataloader = RGBDepthPano(args.NUM_IMGS, eval_img_dir, navigability_dict)  # Evaluation data loader
     if args.TRAINEVAL == 'train':
         trainloader = torch.utils.data.DataLoader(traindataloader, 
         batch_size=args.BATCH_SIZE, shuffle=True, num_workers=4)  # Training batch data loader

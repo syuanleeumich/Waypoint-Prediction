@@ -9,13 +9,13 @@ from torch.utils.data import Dataset, DataLoader
 
 # Data loader and transformations
 class RGBDepthPano(Dataset):
-    def __init__(self, args, img_dir, navigability_dict):
+    def __init__(self, NUM_IMGS, img_dir, navigability_dict):
         # Set input dimension constants
         # self.IMG_WIDTH = 256
         # self.IMG_HEIGHT = 256
         self.RGB_INPUT_DIM = 224  # Input dimension for RGB images
         self.DEPTH_INPUT_DIM = 256  # Input dimension for depth images
-        self.NUM_IMGS = args.NUM_IMGS  # Number of images per sample
+        self.NUM_IMGS = NUM_IMGS  # Number of images per sample
         self.navigability_dict = navigability_dict  # Navigability dictionary for filtering valid waypoints
 
         # RGB image transformations: convert to float and normalize
